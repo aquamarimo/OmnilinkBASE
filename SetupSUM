@@ -1,0 +1,650 @@
+#include <Brain.h>
+
+#include <Brain.h>
+
+void setup()
+{
+ pinMode(4,OUTPUT);
+ Serial.begin(115200); // bit/s //
+ connectHeadset(); //
+}
+void loop()
+{
+delay(1000);
+}
+
+void connectHeadset()
+{
+ 
+ delay(3000);
+ Serial.write(0xc2); //
+ 
+}
+const int redPin = 9;
+const int greenPin = 10;
+const int bluePin = 11;
+const int tinyLedPin = 13;
+const int speakerPin = 12;
+int tinyLedState = HIGH;
+void setup()
+{
+ pinMode(redPin, OUTPUT);
+ pinMode(greenPin, OUTPUT);
+ pinMode(bluePin, OUTPUT);
+ pinMode(tinyLedPin, OUTPUT);
+ pinMode(speakerPin, OUTPUT);
+ Serial.begin(115200); // bit/s //
+ connectHeadset(); //
+}
+#define   BAUDRATE           57600
+#define   LED                13
+#define   Theshold_Eyeblink  110
+#define   EEG_AVG            70
+ 
+long payloadDataS[5] = {0};
+long payloadDataB[32] = {0};
+byte checksum=0,generatedchecksum=0;
+unsigned int Raw_data,Poorquality,Plength,Eye_Enable=0,On_Flag=0,Off_Flag=1 ;
+unsigned int j,n=0;
+long Temp,Avg_Raw,Temp_Avg;
+ 
+void connectHeadset() 
+{ 
+Serial.write(0xc2); 
+}
+void loop() 
+{ 
+float att= getpayload(); 
+}
+byte readOneByte() 
+{ 
+while (!Serial.available()) { 
+delay(5); // ms 
+}; 
+return Serial.read(); 
+}
+float getpayload() 
+{ // return attention percent (0.0 to 1.0); negative (-1, -2...) for error 
+byte generatedChecksum = 0; // <8> 
+byte checksum = 0; 
+int payloadLength = 0; 
+byte payloadData[64] = { 
+0 
+}; 
+eyesclose=0; 
+Serial.flush();
+/* Sync */ 
+if (170 != readOneByte()) return -1; 
+if (170 != readOneByte()) return -1;
+/* Length */ 
+payloadLength = readOneByte(); 
+if (payloadLength > 169) return -2;
+/* Checksum */ 
+generatedChecksum = 0; 
+for (int i = 0; i < payloadLength; i++) { 
+payloadData[i] = readOneByte(); 
+generatedChecksum += payloadData[i]; 
+} 
+generatedChecksum = 255 - generatedChecksum; 
+checksum = readOneByte(); 
+if (checksum != generatedChecksum) return -3;
+/* Payload */ 
+for (int i = 0; i < payloadLength; i++) {
+switch (payloadData[i]) { 
+case 0x02 : 
+i++; 
+poorQuality = payloadData[i]; 
+if (200 == poorQuality) 
+{ 
+return -4; 
+} 
+break; 
+case 0xD1: // Headset Not Found 
+case 0xD2: // Headset Disconnected 
+case 0xD3: // Request Denied 
+case -70: 
+return -5; 
+break; 
+case 0x80 : // raw data appearance 
+i = i + 3; 
+break; 
+case 0x83 : 
+i=i+2; 
+int m=i;
+ void setup()
+ {
+   Serial.begin(BAUDRATE);           // USB
+   pinMode(LED, OUTPUT);
+ }
+ 
+ byte ReadOneByte()           // One Byte Read Function
+ {
+   int ByteRead;
+   while(!Serial.available());
+   ByteRead = Serial.read();
+   return ByteRead;
+ }
+ 
+ void loop()                     // Main Function
+ {
+   if(ReadOneByte() == 170)        // AA 1 st Sync data
+   {
+     if(ReadOneByte() == 170)      // AA 2 st Sync data
+     {
+       Plength = ReadOneByte();
+       if(Plength == 4)   // Small Packet
+       {
+         Small_Packet ();
+       }
+       else if(Plength == 32)   // Big Packet
+       {
+         Big_Packet ();
+       }
+     }
+   }        
+ }
+ 
+ void Small_Packet ()
+ {
+   generatedchecksum = 0;
+   for(int i = 0; i < Plength; i++)
+   { 
+     payloadDataS[i]     = ReadOneByte();      //Read payload into memory
+     generatedchecksum  += payloadDataS[i] ;
+   }
+   generatedchecksum = 255 - generatedchecksum;
+   checksum  = ReadOneByte();
+   if(checksum == generatedchecksum)        // Varify Checksum
+   { 
+     if (j<512)
+     {
+       Raw_data  = ((payloadDataS[2] <<8)| payloadDataS[3]);
+       if(Raw_data&0xF000)
+       {
+         Raw_data = (((~Raw_data)&0xFFF)+1);
+       }
+       else
+       {
+         Raw_data = (Raw_data&0xFFF);
+       }
+       Temp += Raw_data;
+       j++;
+     }
+     else
+     {
+       Onesec_Rawval_Fun ();
+     }
+   }
+ }
+ 
+ void Big_Packet()
+ {
+   generatedchecksum = 0;
+   for(int i = 0; i < Plength; i++)
+   { 
+     payloadDataB[i]     = ReadOneByte();      //Read payload into memory
+     generatedchecksum  += payloadDataB[i] ;
+   }
+   generatedchecksum = 255 - generatedchecksum;
+   checksum  = ReadOneByte();
+   if(checksum == generatedchecksum)        // Varify Checksum
+   {
+     Poorquality = payloadDataB[1];
+     if (Poorquality==0 )
+     {
+       Eye_Enable = 1;
+     }
+     else
+     {
+       Eye_Enable = 0;
+     }
+   }
+ }
+ 
+ void Onesec_Rawval_Fun ()
+ {
+   Avg_Raw = Temp/512;
+   if (On_Flag==0 && Off_Flag==1)
+   {
+     if (n<3)
+     {
+       Temp_Avg += Avg_Raw;
+       n++;
+     }
+     else
+     {
+       Temp_Avg = Temp_Avg/3;
+       if (Temp_Avg<EEG_AVG)
+       {
+         On_Flag=1;Off_Flag=0;
+       }
+       n=0;Temp_Avg=0;
+     } 
+   }             
+   Eye_Blink ();
+   j=0;
+   Temp=0;
+ }
+ 
+ void Eye_Blink ()
+ {
+   if (Eye_Enable)         
+   {
+     if (On_Flag==1 && Off_Flag==0)
+     {
+       if ((Avg_Raw>Theshold_Eyeblink) && (Avg_Raw<350))
+       {
+         digitalWrite(LED,HIGH);
+       }
+       else
+       {
+         if (Avg_Raw>350)
+         {
+           On_Flag==0;Off_Flag==1;
+         }
+         digitalWrite(LED,LOW);
+       }
+     }
+     else
+     {
+       digitalWrite(LED,LOW);
+     }
+   }       
+   else
+   {
+     digitalWrite(LED,LOW);
+   }
+ }
+
+void loop()
+{
+float att=getAttention();
+if(att>0)
+{
+digitalWrite(4,HIGH);
+delay(2000);
+}
+else
+{
+digitalWrite(4,LOW);
+}
+}
+/*** Headset ***/
+void connectHeadset()
+{
+ setGreen();
+ delay(3000);
+ Serial.write(0xc2); //
+ setWhite();
+}
+byte readOneByte()
+{
+ while (!Serial.available()) { //
+ delay(5); // ms
+ };
+ return Serial.read();
+}
+float getAttention()
+{ // return attention percent (0.0 to 1.0)
+ // negative (-1, -2...) for error
+ byte generatedChecksum = 0; //
+ byte checksum = 0;
+ int payloadLength = 0;
+ byte payloadData[64] = {
+ 0
+};
+ int poorQuality = 0;
+ float attention = 0;
+ Serial.flush(); // prevent serial buffer from filling up //
+ /* Sync */
+ if (170 != readOneByte()) return -1; //
+ if (170 != readOneByte()) return -1;
+ /* Length */
+ payloadLength = readOneByte();
+ if (payloadLength > 169) return -2; //
+ /* Checksum */
+ generatedChecksum = 0;
+ for (int i = 0; i < payloadLength; i++) { //
+ // Read payload into array:
+ payloadData[i] = readOneByte();
+ generatedChecksum += payloadData[i];
+ }
+ generatedChecksum = 255 - generatedChecksum;
+ checksum = readOneByte();
+ if (checksum != generatedChecksum) return -3; //
+ /* Payload */
+ for (int i = 0; i < payloadLength; i++) { //
+ switch (payloadData[i]) {
+ case 0xD0:
+ sayHeadsetConnected();
+ break;
+ case 4: //
+ i++; //
+ attention = payloadData[i]; //
+ break;
+ case 2:
+ i++;
+ poorQuality = payloadData[i];
+ if (200 == poorQuality) {
+ setYellow(); //
+ return -4;
+ }
+ break;
+ case 0xD1: // Headset Not Found
+ case 0xD2: // Headset Disconnected
+ case 0xD3: // Request Denied
+ case -70:
+ wave(speakerPin, 900, 500);
+ setWhite();
+ return -5;
+ break;
+case 0x80: // skip RAW //
+ i = i + 3;
+ break;
+ case 0x83: // skip ASIC_EEG_POWER
+ i = i + 25;
+ break;
+ } // switch
+ } // for
+ return (float)attention / 100; //
+}
+/*** Outputs ***/
+void setBlueToRed(float redPercent)
+{
+ int red = redPercent * 255;
+ int blue = (1 - redPercent) * 255;
+ setColor(red, 0, blue);
+}
+void setGreen()
+{
+ setColor(0, 255, 0);
+}
+void setYellow()
+{
+ setColor(255, 255, 0);
+}
+void setWhite()
+{
+ setColor(100, 100, 100);
+}
+void sayHeadsetConnected()
+{
+ wave(speakerPin, 440, 40);
+ delay(25);
+ wave(speakerPin, 300, 20);
+ wave(speakerPin, 540, 40);
+ delay(25);
+ wave(speakerPin, 440, 20);
+ wave(speakerPin, 640, 40);
+ delay(25);
+ wave(speakerPin, 540, 40);
+ delay(25);
+}
+void setColor(int red, int green, int blue)
+{
+ analogWrite(redPin, 255 - red);
+ analogWrite(greenPin, 255 - green);
+ analogWrite(bluePin, 255 - blue);
+}
+void toggleTinyLed()
+{
+ tinyLedState = !tinyLedState;
+ digitalWrite(tinyLedPin, tinyLedState);
+}
+void wave(int pin, float frequency, int duration)
+{
+ float period = 1 / frequency * 1000 * 1000; // microseconds
+ long int startTime = millis();
+ while (millis() - startTime < duration) {
+ digitalWrite(pin, HIGH);
+ delayMicroseconds(period / 2);
+ digitalWrite(pin, LOW);
+ delayMicroseconds(period / 2);
+ }
+}
+Brain brain(Serial);
+int att;
+int med;
+void setup()
+{
+ pinMode(3,OUTPUT);
+ pinMode(6,OUTPUT);
+ Serial.begin(115200); // bit/s //
+ connectHeadset(); //
+}
+void loop()
+{
+  if (brain.update()){
+     med = brain.readMeditation ();
+     att = brain.readAttention ();
+    if(att>10){
+      analogWrite(3,att);
+    }
+    if(med>10){
+      analogWrite(6,med);
+     }
+}
+}
+void connectHeadset()
+{
+ 
+ delay(3000);
+ Serial.write(0xc2); //
+ 
+}
+
+Brain brain(Serial);
+void setup()
+{
+ pinMode(4,OUTPUT);
+ pinMode(6,OUTPUT);
+ Serial.begin(115200); // bit/s //
+ connectHeadset(); //
+}
+void loop()
+{
+  if (brain.update()){
+    if(brain.readAttention()>45&&brain.readMeditation()>45){
+      digitalWrite(4,HIGH);
+      digitalWrite(6,HIGH);
+    } else if (brain.readAttention()>45){
+      digitalWrite(4,HIGH);
+      digitalWrite(6,LOW);
+    } else if (brain.readMeditation()>45){
+      digitalWrite(4,LOW);
+      digitalWrite(6,HIGH);
+    } else {
+      digitalWrite(4,LOW);
+      digitalWrite(6,LOW);
+    }
+  }
+}
+void connectHeadset()
+{
+ 
+ delay(3000);
+ Serial.write(0xc2); //
+ 
+}
+Serial.begin(115200); // bit/s //
+ connectHeadset(); //
+}
+void loop()
+{
+float att=getAttention();
+if(att>0)
+{
+digitalWrite(4,HIGH);
+delay(2000);
+}
+else
+{
+digitalWrite(4,LOW);
+}
+}
+/*** Headset ***/
+void connectHeadset()
+{
+ setGreen();
+ delay(3000);
+ Serial.write(0xc2); //
+ setWhite();
+}
+byte readOneByte()
+{
+ while (!Serial.available()) { //
+ delay(5); // ms
+ };
+ return Serial.read();
+}
+float getAttention()
+{ // return attention percent (0.0 to 1.0)
+ // negative (-1, -2...) for error
+ byte generatedChecksum = 0; //
+ byte checksum = 0;
+ int payloadLength = 0;
+ byte payloadData[64] = {
+ 0
+};
+ int poorQuality = 0;
+ float attention = 0;
+ float meditation=0;
+ Serial.flush(); // prevent serial buffer from filling up //
+ /* Sync */
+ if (170 != readOneByte()) return -1; //
+ if (170 != readOneByte()) return -1;
+ /* Length */
+ payloadLength = readOneByte();
+ if (payloadLength > 169) return -2; //
+ /* Checksum */
+ generatedChecksum = 0;
+ for (int i = 0; i < payloadLength; i++) { //
+ // Read payload into array:
+ payloadData[i] = readOneByte();
+ generatedChecksum += payloadData[i];
+ }
+ generatedChecksum = 255 - generatedChecksum;
+ checksum = readOneByte();
+ if (checksum != generatedChecksum) return -3; //
+ /* Payload */
+ for (int i = 0; i < payloadLength; i++) { //
+ switch (payloadData[i]) {
+ case 0xD0:
+ sayHeadsetConnected();
+ break;
+ case 4: //
+ i++; //
+ attention = payloadData[i]; //
+ break;
+   case 5:
+            i++;
+            meditation = payloadData[i];
+            break;
+ case 2:
+ i++;
+ poorQuality = payloadData[i];
+ if (200 == poorQuality) {
+ setYellow(); //
+ return -4;
+ }
+ break;
+ 
+ case 0xD1: // Headset Not Found
+ case 0xD2: // Headset Disconnected
+ case 0xD3: // Request Denied
+ case -70:
+ wave(speakerPin, 900, 500);
+ setWhite();
+ return -5;
+ break;
+case 0x80: // skip RAW //
+ i = i + 3;
+ break;
+ case 0x83: // skip ASIC_EEG_POWER
+ i = i + 25;
+ break;
+ } // switch
+ } // for
+ return (float)meditation / 100; //
+}
+/*** Outputs ***/
+void setBlueToRed(float redPercent)
+{
+ int red = redPercent * 255;
+ int blue = (1 - redPercent) * 255;
+ setColor(red, 0, blue);
+}
+void setGreen()
+{
+ setColor(0, 255, 0);
+}
+void setYellow()
+{
+ setColor(255, 255, 0);
+}
+void setWhite()
+{
+ setColor(100, 100, 100);
+}
+void sayHeadsetConnected()
+{
+ wave(speakerPin, 440, 40);
+ delay(25);
+ wave(speakerPin, 300, 20);
+ wave(speakerPin, 540, 40);
+ delay(25);
+ wave(speakerPin, 440, 20);
+ wave(speakerPin, 640, 40);
+ delay(25);
+ wave(speakerPin, 540, 40);
+ delay(25);
+}
+void setColor(int red, int green, int blue)
+{
+ analogWrite(redPin, 255 - red);
+ analogWrite(greenPin, 255 - green);
+ analogWrite(bluePin, 255 - blue);
+}
+void toggleTinyLed()
+{
+ tinyLedState = !tinyLedState;
+ digitalWrite(tinyLedPin, tinyLedState);
+}
+void wave(int pin, float frequency, int duration)
+{
+ float period = 1 / frequency * 1000 * 1000; // microseconds
+ long int startTime = millis();
+ while (millis() - startTime < duration) {
+ digitalWrite(pin, HIGH);
+ delayMicroseconds(period / 2);
+ digitalWrite(pin, LOW);
+ delayMicroseconds(period / 2);
+ }
+}
+void setup()
+{
+ pinMode(12,OUTPUT);
+ pinMode(6,OUTPUT);
+ Serial.begin(115200); // bit/s //
+ connectHeadset(); //
+}
+void loop()
+{
+  if (brain.update()){
+    if(brain.readAttention()>70){
+      digitalWrite(12,HIGH);
+     
+    } else {
+      digitalWrite(12,LOW);
+     
+    }
+  }
+}
+void connectHeadset()
+{ 
+ delay(3000);
+ Serial.write(0xc2); 
+}
+
+
+
